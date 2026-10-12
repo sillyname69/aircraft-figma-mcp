@@ -1,4 +1,4 @@
-# figma-write-mcp (unofficial)
+# Aircraft Figma MCP (unofficial)
 
 An MCP server that lets Claude create and edit designs directly in the **Figma desktop app**. Works on a **free Figma account** — no plugin publishing or approval required.
 
