@@ -1,0 +1,6 @@
+# figma-write-mcp — OPTIONAL OCR/vision script dependencies
+# Only needed for scripts/extract-geometry.py
+# Also requires the Tesseract binary — see README: "Optional OCR Scripts"
+opencv-python>=4.8.0
+numpy>=1.24.0
+pytesseract>=0.3.10

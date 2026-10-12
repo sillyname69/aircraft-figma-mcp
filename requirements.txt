@@ -1,0 +1,6 @@
+# figma-write-mcp — core server dependencies (server.py)
+# Python 3.10 or later required
+mcp>=2.0
+websockets>=13.0
+anyio>=4.0
+pydantic>=2.0

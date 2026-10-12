@@ -1,0 +1,88 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  body { font: 12px/1.4 Inter, system-ui, sans-serif; margin: 0; padding: 14px;
+         color: var(--figma-color-text); background: var(--figma-color-bg); }
+  .row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: #c9c9c9; }
+  .dot.on { background: #14ae5c; }
+  .dot.err { background: #f24822; }
+  #log { color: var(--figma-color-text-secondary); font-size: 11px; min-height: 30px; }
+  input[type=number] { width: 70px; }
+  button { font: inherit; }
+  label { color: var(--figma-color-text-secondary); }
+</style>
+</head>
+<body>
+  <div class="row"><span id="dot" class="dot"></span><strong id="status">Connecting…</strong></div>
+  <div class="row">
+    <label>Port</label> <input id="port" type="number" value="3055" />
+    <button id="reconnect">Reconnect</button>
+  </div>
+  <div id="log"></div>
+<script>
+  const $ = (id) => document.getElementById(id);
+  let ws = null, retry = null, count = 0;
+  let identity = null, identitySent = false;
+
+  function setStatus(text, cls) {
+    $("status").textContent = text;
+    $("dot").className = "dot" + (cls ? " " + cls : "");
+  }
+
+  function sendIdentityIfReady() {
+    if (identity && ws && ws.readyState === 1 && !identitySent) {
+      ws.send(JSON.stringify({ type: "identify", payload: identity }));
+      identitySent = true;
+    }
+  }
+
+  function connect() {
+    clearTimeout(retry);
+    if (ws) { ws.onclose = null; ws.close(); }
+    const port = $("port").value || 3055;
+    setStatus("Connecting…");
+    ws = new WebSocket(`ws://localhost:${port}`);
+    ws.onopen = () => { setStatus("Connected to Claude", "on"); sendIdentityIfReady(); };
+    ws.onmessage = (e) => {
+      let msg; try { msg = JSON.parse(e.data); } catch { return; }
+      count++;
+      $("log").textContent = `${count} command${count === 1 ? "" : "s"} · last: ${msg.command}`;
+      parent.postMessage({ pluginMessage: { type: "command", payload: msg } }, "*");
+    };
+    ws.onerror = () => setStatus("MCP server not running", "err");
+    ws.onclose = (e) => {
+      identitySent = false;
+      if (e.code === 1008) {
+        setStatus("Rejected: forbidden origin", "err");
+        $("log").textContent = "Server refused the connection origin — check server log.";
+      } else {
+        setStatus("Disconnected — retrying", "err");
+        retry = setTimeout(connect, 2000);
+      }
+    };
+  }
+
+  window.onmessage = (e) => {
+    const m = e.data.pluginMessage;
+    if (!m) return;
+    if (m.type === "identity") {
+      identity = m.payload;
+      if (!identitySent) {
+        sendIdentityIfReady();
+      } else if (ws && ws.readyState === 1) {
+        // Re-identify on page change — bypass identitySent gate.
+        ws.send(JSON.stringify({ type: "identify", payload: identity }));
+      }
+      return;
+    }
+    if (m.type === "result" && ws && ws.readyState === 1) ws.send(JSON.stringify(m.payload));
+  };
+
+  $("reconnect").onclick = connect;
+  connect();
+</script>
+</body>
+</html>
